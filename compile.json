@@ -1,0 +1,17 @@
+[
+	{
+		"lang": "C",
+		"ext": ".c",
+		"command": "gcc ${id}.c -O2 -o ${id}"
+	},
+	{
+		"lang": "C++",
+		"ext": ".cpp",
+		"command": "g++ ${id}.cpp -O2 -o ${id}"
+	},
+	{
+		"lang": "Pascal",
+		"ext": ".pas",
+		"command": "fpc ${id}.pas -o ${id}"
+	}
+]
