@@ -58,15 +58,17 @@ int main(int argc, char *argv[])
 	}
 	cmd =	getCompileCommand(argv[1], atoi(argv[2]));
 	if (!cmd) exit(RET_SE);
-	signal(SIGALRM, timeout);
-	alarm(compile_time_limit);
+	//signal(SIGALRM, timeout);
+	//alarm(compile_time_limit);
 	if ((pid = fork()) == 0)
 	{
-		/*struct rlimit rlim;
-		rlim.rlim_cur = compile_file_limit * 1024;
+		struct rlimit rlim;
+		/*rlim.rlim_cur = compile_file_limit * 1024;
 		rlim.rlim_max = compile_file_limit * 1024;
-		setrlimit(RLIMIT_FSIZE, &rlim);*/
-		//putenv("LC_ALL=en_US.UTF-8");
+		setrlimit(RLIMIT_FSIZE, &rlim);
+		putenv("LC_ALL=en_US.UTF-8");*/
+		rlim.rlim_cur = rlim.rlim_max = compile_time_limit;
+		setrlimit(RLIMIT_CPU, &rlim);
 		freopen("ce.txt", "w", stderr);
 		chdir("chroot");
 		setpgid(0, getpid());
@@ -83,15 +85,8 @@ int main(int argc, char *argv[])
 		else if (WIFSIGNALED(stat))
 		{
 			kill(-pid, SIGTERM);
-			switch (WTERMSIG(stat))
-			{
-				case SIGUSR1:
-					printf("Compile Time Limit Exceed!\n");
-					exit(RET_CE);
-				case SIGXFSZ:
-					printf("Compile Output Limit Exceed!\n");
-					exit(RET_CE);
-			}
+			if (WTERMSIG(stat) == SIGXFSZ)
+				exit(RET_CE);
 		}
 	}
 	return 0;
