@@ -76,7 +76,7 @@ int main(int argc, char *argv[])
 	if ((pid = fork()) == 0)
 	{
 		//signal(SIGXCPU, func);
-		chdir("chroot");
+		chdir("sandbox");
 		r.rlim_cur = r.rlim_max = 3;
 		setrlimit(RLIMIT_CPU, &r);
 		setuid(99);
