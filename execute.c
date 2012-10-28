@@ -10,40 +10,32 @@
 #include <sys/syscall.h>
 #include <sys/resource.h>
 #include "judger.h"
+#include "syscall.h"
 #define OUTPUT_FILE "output.txt"
-#define MAX_SYSCALL 349
-
-int avail_syscall[MAX_SYSCALL] = {
-	[SYS_fork] = 0
-};
 
 int pid;
-int valid_syscall[1024];
-
-void getSyscallTable()
-{
-	FILE *f = fopen("syscall.txt", "r");
-	int i;
-	for (i = 0; i < 342; i++)
-		fscanf(f, "%d", &valid_syscall[i]);
-	fclose(f);
-}
 
 int checkSyscall()
 {
 	struct user_regs_struct regs;
 	int syscall;
 	ptrace(PTRACE_GETREGS, pid, NULL, &regs);
+	#ifdef __i386__
 	syscall = regs.orig_eax;
-	//printf("%d\n", valid_syscall[syscall]);
-	/*if (!valid_syscall[syscall])
-		return RET_RF;*/
-/*	else
+	#else
+	syscall = regs.orig_rax;
+	#endif
+
+	//printf("syscall: %d\n", syscall);
+
+	if (avail_syscall[syscall] == 0)
 	{
-			 
+		printf("Invalid syscall: %d\n", syscall);
+		return RET_RF;
 	}
-*/
-	return regs.orig_eax;
+	else if (avail_syscall[syscall] > 0)
+		avail_syscall[syscall]--;
+	return RET_AC;
 }
 
 int getMemory() //KBytes
@@ -63,7 +55,7 @@ int main(int argc, char *argv[])
 	int tdcount, tlimit, mlimit;
 	char exename[1024], inputfile[1024];
 	struct rlimit r;
-	
+
 	if (argc < 6)
 	{
 		printf("Usage: [id] [probid] [input] [time limit] [memory limit]\n");
@@ -76,15 +68,17 @@ int main(int argc, char *argv[])
 	sprintf(exename, "./%s", argv[1]);
 	strcpy(inputfile, argv[3]);
 
-	getSyscallTable();
 
 	if ((pid = fork()) == 0)
 	{
-		//signal(SIGXCPU, func);
+		freopen("input.txt", "r", stdin);
 		chdir("sandbox");
+		chroot(".");
+		freopen("output.txt", "w", stdout);
 		r.rlim_cur = r.rlim_max = 3;
 		setrlimit(RLIMIT_CPU, &r);
-		setuid(99);
+		setregid(99, 99);
+		setreuid(99, 99);
 		ptrace(PTRACE_TRACEME, 0, NULL, NULL);
 		execl(exename, exename, NULL);
 	}
@@ -92,24 +86,25 @@ int main(int argc, char *argv[])
 	{
 		int stat, maxmem = 0, tmpmem;
 		struct rusage rinfo;
-		//struct user_regs_struct regs;
 		for (;;)
 		{
 			wait4(pid, &stat, 0, &rinfo);
 			if (WIFEXITED(stat))
-			{
-				//puts("Exited!");
 				break;
-			}
 			else if (WIFSTOPPED(stat))
 			{
 				switch (WSTOPSIG(stat))
 				{
 					case SIGTRAP:
-						checkSyscall();
+						if (checkSyscall() == RET_RF)
+						{
+							ptrace(PTRACE_KILL, pid, NULL, NULL);
+							exit(RET_RF);
+						}
 						break;
 				}
 			}
+			
 			tmpmem = getMemory();
 			if (tmpmem > maxmem) maxmem = tmpmem;
 			ptrace(PTRACE_SYSCALL, pid, NULL, NULL);
