@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
 		rlim.rlim_cur = rlim.rlim_max = compile_time_limit;
 		setrlimit(RLIMIT_CPU, &rlim);
 		freopen("ce.txt", "w", stderr);
-		chdir("chroot");
+		chdir("sandbox");
 		setpgid(0, getpid());
 		execl("/bin/sh", "sh", "-c", cmd, NULL);
 	}
