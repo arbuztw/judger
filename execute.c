@@ -14,6 +14,8 @@
 #define OUTPUT_FILE "output.txt"
 
 int pid;
+int maxmem;
+struct rusage rinfo;
 
 int checkSyscall()
 {
@@ -50,6 +52,29 @@ int getMemory() //KBytes
 	return r * getpagesize() / 1024;
 }
 
+int getRuntime() //MS
+{
+	double r;
+	r = (rinfo.ru_utime.tv_sec + rinfo.ru_stime.tv_sec) * 1000;
+	r += (double)(rinfo.ru_utime.tv_usec + rinfo.ru_stime.tv_usec) / 1000;
+	return (int)r;
+}
+
+void timer(int sig)
+{
+	kill(pid, SIGUSR1);
+	alarm(1);
+}
+
+
+void final_result(int r)
+{
+	printf("Runtime: %d MS\n", getRuntime());
+	printf("Memory: %d KB\n", maxmem);
+	exit(r);
+}
+
+
 int main(int argc, char *argv[])
 {
 	int tdcount, tlimit, mlimit;
@@ -75,43 +100,62 @@ int main(int argc, char *argv[])
 		chdir("sandbox");
 		chroot(".");
 		freopen("output.txt", "w", stdout);
-		r.rlim_cur = r.rlim_max = 3;
-		setrlimit(RLIMIT_CPU, &r);
 		setregid(99, 99);
 		setreuid(99, 99);
 		ptrace(PTRACE_TRACEME, 0, NULL, NULL);
 		execl(exename, exename, NULL);
+		exit(0);
 	}
-	else
-	{
-		int stat, maxmem = 0, tmpmem;
-		struct rusage rinfo;
-		for (;;)
-		{
-			wait4(pid, &stat, 0, &rinfo);
-			if (WIFEXITED(stat))
-				break;
-			else if (WIFSTOPPED(stat))
-			{
-				switch (WSTOPSIG(stat))
-				{
-					case SIGTRAP:
-						if (checkSyscall() == RET_RF)
-						{
-							ptrace(PTRACE_KILL, pid, NULL, NULL);
-							exit(RET_RF);
-						}
-						break;
-				}
-			}
-			
-			tmpmem = getMemory();
-			if (tmpmem > maxmem) maxmem = tmpmem;
-			ptrace(PTRACE_SYSCALL, pid, NULL, NULL);
-		}
-		printf("Memory: %d KB\n", maxmem);
-	}
+	
+	signal(SIGALRM, timer);
+	alarm(1);
 
+	int stat, tmpmem, sig;
+	for (;;)
+	{
+		wait4(pid, &stat, 0, &rinfo);
+		if (WIFEXITED(stat))
+		{
+			puts("exited!\n");
+			break;
+		}
+		else if (WIFSTOPPED(stat))
+		{
+			sig = WSTOPSIG(stat);
+			if (sig == SIGTRAP)
+			{
+					if (checkSyscall() == RET_RF)
+					{
+						ptrace(PTRACE_KILL, pid, NULL, NULL);
+						final_result(RET_RF);
+					}
+			}
+			else if (sig == SIGUSR1)
+			{
+			}
+			else
+				printf("Stopped due to signal: %d\n", sig);
+		}
+		else if (WIFSIGNALED(stat))
+		{
+			//Runtime Error
+			printf("Runtime Error. Received signal: %d\n", WTERMSIG(stat));
+			final_result(RET_RE);
+			break;
+		}
+		tmpmem = getMemory();
+		if (tmpmem > maxmem) maxmem = tmpmem;
+
+		if (maxmem > mlimit)
+			final_result(RET_MLE);
+		if (getRuntime() > tlimit)
+		{
+			ptrace(PTRACE_KILL, pid, NULL, NULL);
+			final_result(RET_TLE);
+		}
+		ptrace(PTRACE_SYSCALL, pid, NULL, NULL);
+	}
+	final_result(RET_AC);
 	
 	return 0;
 }
