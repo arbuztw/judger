@@ -57,11 +57,6 @@ int avail_syscall[MAX_SYSCALL] = {
 	S(exit_group) = 1,
 	S(fstatfs64) = -1,
 	S(fstatat64) = -1,
-	S(getcwd) = -1,
-	S(open) = -1,
-	S(close) = -1,
-	S(dup3) = -1,
-	S(pipe2) = -1,
 };
 
 #endif /* __SYSCALL_H__ */
