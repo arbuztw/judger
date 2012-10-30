@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 #include "judger.h"
 #define BUFSZ 1024
 
@@ -22,31 +23,57 @@ void trim(char str[])
 	str[i+1] = 0;
 }
 
+void usage()
+{
+	printf("\
+Usage: compare [options] file1 file2\n\
+Options:\n\
+  -s	Ignore spaces at the end of the line\n\
+  -l	Ignore all blank lines\n\
+  -e	Ignore blank lines ONLY at the end of the file\n");
+}
+
+
+
 int main(int argc, char *argv[])
 {
-	if (argc < 3) return 0;
-
-	int outed, ansed, sflg = 1, lflg = 1, eflg = 1;
+	int ed1, ed2, sflg = 0, lflg = 0, eflg = 0;
+	char ch;
 	char s1[BUFSZ], s2[BUFSZ];
-	FILE *fout, *fans;
+	FILE *f1, *f2;
 
-	fout = fopen(argv[1], "r");
-	fans = fopen(argv[2], "r");
+	opterr = 0;
+	while (~(ch = getopt(argc, argv, "sle")))
+		switch (ch)
+		{
+			case 's': sflg = 1; break;
+			case 'l': lflg = 1; break;
+			case 'e': eflg = 1; break;
+		}
+
+	if (argc - optind < 2) 
+	{
+		usage();
+		return RET_SE;
+	}
+
+	f1 = fopen(argv[optind], "r");
+	f2 = fopen(argv[optind+1], "r");
 
 	for (;;)
 	{
-		outed = !fgets(s1, BUFSZ, fout);
-		ansed = !fgets(s2, BUFSZ, fans);
+		ed1 = !fgets(s1, BUFSZ, f1);
+		ed2 = !fgets(s2, BUFSZ, f2);
 		
 		if (lflg)
 		{
-			while (!outed && isBlank(s1))
-				outed = !fgets(s1, BUFSZ, fout);
-			while (!ansed && isBlank(s2))
-				ansed = !fgets(s2, BUFSZ, fans);
+			while (!ed1 && isBlank(s1))
+				ed1 = !fgets(s1, BUFSZ, f1);
+			while (!ed2 && isBlank(s2))
+				ed2 = !fgets(s2, BUFSZ, f2);
 		}
 
-		if (outed && ansed) break;
+		if (ed1 && ed2) break;
 
 		if (sflg)
 		{
@@ -54,8 +81,8 @@ int main(int argc, char *argv[])
 			trim(s2);
 		}
 
-		if (eflg && (outed && !isBlank(s2) || ansed && !isBlank(s1)) ||
-			!eflg && strcmp(s1, s2))
+		if (eflg && (ed1 && !isBlank(s2) || ed2 && !isBlank(s1)) ||
+			!eflg && (strcmp(s1, s2) || ed1 || ed2))
 			return RET_WA;
 	}
 
