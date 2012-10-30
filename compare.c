@@ -58,7 +58,17 @@ int main(int argc, char *argv[])
 	}
 
 	f1 = fopen(argv[optind], "r");
+	if (!f1)
+	{
+		printf("Cannot open file: %s\n", argv[optind]);
+		return RET_SE;
+	}
 	f2 = fopen(argv[optind+1], "r");
+	if (!f2)
+	{
+		printf("Cannot open file: %s\n", argv[optind+1]);
+		return RET_SE;
+	}
 
 	for (;;)
 	{
