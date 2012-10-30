@@ -28,7 +28,7 @@ void usage()
 	printf("\
 Usage: compare [options] file1 file2\n\
 Options:\n\
-  -s	Ignore spaces at the end of the line\n\
+  -s	Ignore spaces and tabs at the end of the line\n\
   -l	Ignore all blank lines\n\
   -e	Ignore blank lines ONLY at the end of the file\n");
 }
@@ -91,8 +91,13 @@ int main(int argc, char *argv[])
 			trim(s2);
 		}
 
-		if (eflg && (ed1 && !isBlank(s2) || ed2 && !isBlank(s1)) ||
-			!eflg && (strcmp(s1, s2) || ed1 || ed2))
+		if (ed1 || ed2)
+		{
+			if (eflg && (ed1 && !isBlank(s2) || ed2 && !isBlank(s1)) ||
+				!eflg)
+				return RET_WA;
+		}
+		else if (strcmp(s1, s2))
 			return RET_WA;
 	}
 
